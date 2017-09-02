@@ -8,7 +8,7 @@ import (
 
 	context "golang.org/x/net/context"
 
-	"github.com/boz/pidattest/proto"
+	"github.com/boz/circumspect/proto"
 
 	grpc "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"

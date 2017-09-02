@@ -6,8 +6,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/boz/pidattest/agent"
-	"github.com/boz/pidattest/worker"
+	"github.com/boz/circumspect/agent"
+	"github.com/boz/circumspect/worker"
 )
 
 var (
