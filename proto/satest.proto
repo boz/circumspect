@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package proto;
+
+service Workload {
+  rpc Register (Request) returns (Response) {}
+}
+
+message Request  {}
+message Response {}

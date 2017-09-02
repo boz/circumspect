@@ -1,0 +1,7 @@
+/pidattest
+/pidattest-linux
+/.vagrant
+/*.log
+/vendor/*
+!/vendor/vendor.json
+
