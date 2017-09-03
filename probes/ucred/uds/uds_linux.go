@@ -9,6 +9,7 @@ import (
 
 func FromConn(conn net.Conn) (Props, error) {
 	uconn, ok := conn.(*net.UnixConn)
+
 	if !ok {
 		return nil, ErrInvalidConnection
 	}

@@ -5,7 +5,7 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/boz/circumspect/ucred/uds"
+	"github.com/boz/circumspect/probes/ucred/uds"
 
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/peer"

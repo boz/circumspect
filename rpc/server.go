@@ -4,11 +4,13 @@ import (
 	"errors"
 	"log"
 	"net"
+	"os"
 	"syscall"
 
 	context "golang.org/x/net/context"
 
-	ucgrpc "github.com/boz/circumspect/ucred/grpc"
+	"github.com/boz/circumspect/probes/docker"
+	ucgrpc "github.com/boz/circumspect/probes/ucred/grpc"
 	grpc "google.golang.org/grpc"
 )
 
@@ -24,15 +26,21 @@ func RunServer(log *log.Logger, path string) error {
 	}
 	defer sock.Close()
 
+	docker, err := docker.NewService(context.Background())
+	if err != nil {
+		return err
+	}
+
 	s := grpc.NewServer(grpc.Creds(ucgrpc.NewCredentials()))
 
-	RegisterWorkloadServer(s, &server{log})
+	RegisterWorkloadServer(s, &server{log, docker})
 
 	return s.Serve(sock)
 }
 
 type server struct {
-	log *log.Logger
+	log    *log.Logger
+	docker docker.Service
 }
 
 func (s *server) Register(ctx context.Context, req *Request) (*Response, error) {
@@ -44,6 +52,16 @@ func (s *server) Register(ctx context.Context, req *Request) (*Response, error) 
 	}
 
 	s.log.Printf("register request from [pid: %v uid: %v gid: %v]", props.Pid(), props.Uid(), props.Gid())
+
+	dprops, err := s.docker.Lookup(ctx, props)
+	if err != nil {
+		s.log.Printf("error getting docker properties: %v", err)
+		return &Response{}, err
+	}
+
+	log.Printf("found docker container %v", dprops.DockerID())
+
+	docker.PrintProps(os.Stdout, dprops)
 
 	return &Response{}, nil
 }
