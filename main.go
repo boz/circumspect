@@ -6,8 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/boz/circumspect/agent"
-	"github.com/boz/circumspect/worker"
+	"github.com/boz/circumspect/rpc"
 )
 
 var (
@@ -15,7 +14,7 @@ var (
 )
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: %v <worker|agent> [ -s socket-path ]\n", os.Args[0])
+	fmt.Fprintf(os.Stderr, "usage: %v <client|server> [ -s socket-path ]\n", os.Args[0])
 	flag.PrintDefaults()
 	os.Exit(1)
 }
@@ -33,10 +32,10 @@ func main() {
 	var err error
 
 	switch flag.Arg(0) {
-	case "worker":
-		err = worker.Run(log, *flagSocket)
-	case "agent":
-		err = agent.Run(log, *flagSocket)
+	case "client":
+		err = rpc.RunClient(log, *flagSocket)
+	case "server":
+		err = rpc.RunServer(log, *flagSocket)
 	default:
 		usage()
 	}

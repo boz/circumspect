@@ -8,8 +8,8 @@ Example grpc credentials which capture `{pid,uid,gid}` of client.
 make linux
 vagrant up
 vagrant ssh
-/vagrant/pidattest-linux agent &
-/vagrant/pidattest-linux worker
+/vagrant/circumspect-linux server &
+/vagrant/circumspect-linux client
 kill %1
 ```
 

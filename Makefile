@@ -8,7 +8,7 @@ circumspect-linux:
 	GOOS=linux go build -o circumspect-linux .
 
 proto:
-	protoc --go_out=plugins=grpc:. proto/satest.proto
+	protoc --go_out=plugins=grpc:. rpc/rpc.proto
 
 clean:
 	rm circumspect circumspect-linux 2>/dev/null || true

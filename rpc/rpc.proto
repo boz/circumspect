@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package proto;
+package rpc;
 
 service Workload {
   rpc Register (Request) returns (Response) {}

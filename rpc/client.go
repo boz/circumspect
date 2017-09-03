@@ -1,4 +1,4 @@
-package worker
+package rpc
 
 import (
 	"log"
@@ -7,12 +7,10 @@ import (
 
 	context "golang.org/x/net/context"
 
-	"github.com/boz/circumspect/proto"
-
 	grpc "google.golang.org/grpc"
 )
 
-func Run(log *log.Logger, path string) error {
+func RunClient(log *log.Logger, path string) error {
 
 	log.Printf("connecting to %v...", path)
 
@@ -23,9 +21,9 @@ func Run(log *log.Logger, path string) error {
 	}
 	defer conn.Close()
 
-	client := proto.NewWorkloadClient(conn)
+	client := NewWorkloadClient(conn)
 
-	_, err = client.Register(context.Background(), &proto.Request{})
+	_, err = client.Register(context.Background(), &Request{})
 	if err != nil {
 		log.Printf("error registering: %v", err)
 		return err
