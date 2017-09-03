@@ -89,6 +89,6 @@ func runDocker(log *log.Logger) error {
 
 type pidProps int
 
-func (p pidProps) Pid() int32 {
-	return int32(p)
+func (p pidProps) Pid() int {
+	return int(p)
 }

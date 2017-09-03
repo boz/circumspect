@@ -7,7 +7,7 @@ import (
 )
 
 type RequiredProps interface {
-	Pid() int32
+	Pid() int
 }
 
 type Service interface {
@@ -69,7 +69,7 @@ type service struct {
 }
 
 func (s *service) Lookup(ctx context.Context, pprops RequiredProps) (Props, error) {
-	return s.registry.Lookup(ctx, int(pprops.Pid()))
+	return s.registry.Lookup(ctx, pprops.Pid())
 }
 
 func (s *service) Shutdown() {

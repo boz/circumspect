@@ -25,5 +25,5 @@ func FromConn(conn net.Conn) (Props, error) {
 		return nil, err
 	}
 
-	return newProps(ucred.Pid, ucred.Uid, ucred.Gid), nil
+	return newProps(int(ucred.Pid), uint(ucred.Uid), uint(ucred.Gid)), nil
 }

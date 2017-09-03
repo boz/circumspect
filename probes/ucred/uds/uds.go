@@ -8,29 +8,29 @@ var (
 )
 
 type Props interface {
-	Pid() int32
-	Uid() uint32
-	Gid() uint32
+	Pid() int
+	Uid() uint
+	Gid() uint
 }
 
-func newProps(pid int32, uid uint32, gid uint32) Props {
+func newProps(pid int, uid uint, gid uint) Props {
 	return &props{pid, uid, gid}
 }
 
 type props struct {
-	pid int32
-	uid uint32
-	gid uint32
+	pid int
+	uid uint
+	gid uint
 }
 
-func (p *props) Pid() int32 {
+func (p *props) Pid() int {
 	return p.pid
 }
 
-func (p *props) Uid() uint32 {
+func (p *props) Uid() uint {
 	return p.uid
 }
 
-func (p *props) Gid() uint32 {
+func (p *props) Gid() uint {
 	return p.gid
 }
