@@ -19,6 +19,9 @@ image: build-linux
 proto:
 	protoc --go_out=plugins=grpc:. rpc/rpc.proto
 
+install-libs:
+	govendor build -i +local,^program
+
 clean:
 	rm circumspect circumspect-linux 2>/dev/null || true
 

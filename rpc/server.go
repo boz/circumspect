@@ -10,7 +10,7 @@ import (
 	context "golang.org/x/net/context"
 
 	"github.com/boz/circumspect/probes/docker"
-	ucgrpc "github.com/boz/circumspect/probes/ucred/grpc"
+	udsgrpc "github.com/boz/circumspect/probes/uds/grpc"
 	grpc "google.golang.org/grpc"
 )
 
@@ -31,7 +31,7 @@ func RunServer(log *log.Logger, path string) error {
 		return err
 	}
 
-	s := grpc.NewServer(grpc.Creds(ucgrpc.NewCredentials()))
+	s := grpc.NewServer(grpc.Creds(udsgrpc.NewCredentials()))
 
 	RegisterWorkloadServer(s, &server{log, docker})
 
@@ -44,7 +44,7 @@ type server struct {
 }
 
 func (s *server) Register(ctx context.Context, req *Request) (*Response, error) {
-	props, ok := ucgrpc.PropsFromContext(ctx)
+	props, ok := udsgrpc.PropsFromContext(ctx)
 
 	if !ok {
 		s.log.Printf("no properties for peer")

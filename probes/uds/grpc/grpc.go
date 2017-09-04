@@ -5,14 +5,14 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/boz/circumspect/probes/ucred/uds"
+	"github.com/boz/circumspect/probes/uds"
 
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/peer"
 )
 
 const (
-	authType = "ucred-grpc"
+	authType = "uds-grpc"
 )
 
 func NewCredentials() credentials.TransportCredentials {
@@ -26,14 +26,14 @@ func (c *txCredentials) ClientHandshake(_ context.Context, _ string, conn net.Co
 }
 
 func (c *txCredentials) ServerHandshake(conn net.Conn) (net.Conn, credentials.AuthInfo, error) {
-	ucred, err := uds.FromConn(conn)
+	props, err := uds.FromConn(conn)
 
 	if err != nil {
 		// returning an error here hung the connection
 		return conn, unknownAuthInfo{err}, nil
 	}
 
-	return conn, authInfo{ucred}, nil
+	return conn, authInfo{props}, nil
 }
 
 func (c *txCredentials) Info() credentials.ProtocolInfo {
