@@ -145,8 +145,5 @@ func defaultKubeConfig() (*rest.Config, error) {
 		return config, nil
 	}
 
-	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		clientcmd.NewDefaultClientConfigLoadingRules(),
-		&clientcmd.ConfigOverrides{},
-	).ClientConfig()
+	return clientcmd.DefaultClientConfig.ClientConfig()
 }

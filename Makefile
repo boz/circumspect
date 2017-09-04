@@ -22,6 +22,13 @@ proto:
 install-libs:
 	govendor build -i +local,^program
 
+minikube-install-kubectl:
+	minikube ssh -- curl -LO https://storage.googleapis.com/kubernetes-release/release/$$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+	minikube ssh -- chmod a+x ./kubectl
+
+minikube-install-circumspect:
+	scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $$(minikube ssh-key) circumspect-linux docker@$$(minikube ip):
+
 clean:
 	rm circumspect circumspect-linux 2>/dev/null || true
 
