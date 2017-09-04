@@ -3,7 +3,7 @@ DOCKER_IMAGE ?= circumspect
 IMG_LDFLAGS := -w -linkmode external -extldflags "-static"
 
 build:
-	govendor build +local
+	go build .
 
 ifeq ($(shell uname -s),Darwin)
 build-linux:

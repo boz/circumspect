@@ -10,8 +10,19 @@ import (
 
 var ErrInvalidPid = errors.New("Invalid PID")
 
+// Registry contains a set of running containers and
+// allows for finding which container a PID belongs to, if any.
 type Registry interface {
-	Lookup(context.Context, int) (Props, error)
+
+	// Lookup will try to find properties for the container that
+	// is running the given pid.
+	// If no container is found it will block until one becomes known
+	// or the given context has been cancelled.
+	// TODO: have a default timeout (~1s to start)
+	Lookup(ctx context.Context, pid int) (Props, error)
+
+	// Submit notifies the registry of a new or updated
+	// container
 	Submit(types.ContainerJSON) error
 
 	Shutdown()
@@ -75,6 +86,7 @@ func (r *registry) Lookup(ctx context.Context, pid int) (Props, error) {
 
 	req := &registryLookupRequest{pid, ch, donech}
 
+	// submit request
 	select {
 	case <-r.ctx.Done():
 		return nil, ErrNotRunning
@@ -83,12 +95,15 @@ func (r *registry) Lookup(ctx context.Context, pid int) (Props, error) {
 	case r.lookupch <- req:
 	}
 
+	// wait for response or timeout
 	select {
 	case <-r.ctx.Done():
 		return nil, ErrNotRunning
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case props, ok := <-ch:
+
+		// ch is only closed if an invalid PID is given.
 		if !ok {
 			return nil, ErrInvalidPid
 		}
@@ -129,6 +144,7 @@ loop:
 		}
 	}
 
+	// drain pending lookups
 	for len(r.pendingLookups) > 0 {
 		r.purgeLookup(<-r.purgech)
 	}
@@ -138,6 +154,7 @@ loop:
 func (r *registry) doSubmit(c types.ContainerJSON) {
 	pid := c.State.Pid
 
+	// see if there are any lookups waiting for the PID of this container.
 	for _, lookup := range r.pendingLookups {
 		if lookup.accept(pid) {
 			lookup.resolve(c)
@@ -152,6 +169,10 @@ func (r *registry) doLookup(req *registryLookupRequest) {
 
 	pid := req.pid
 
+	// starting with the given pid, check if there are any containers
+	// whose root process has the same pid.
+	// repeat with the parent pid until a container is found
+	// or the pid is init (pid == 1).
 	for pid > 1 {
 
 		for _, c := range r.containers {
@@ -172,10 +193,16 @@ func (r *registry) doLookup(req *registryLookupRequest) {
 
 	}
 
+	// if no valid pids were found,
+	// this was somehow a bogus PID.
 	if len(pids) == 0 {
 		close(req.ch)
 		return
 	}
+
+	// no containers were found.
+	// save all pid generations and wait for a new
+	// container to be submitted that matches
 
 	lookup := &registryLookup{req, pids}
 

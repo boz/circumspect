@@ -15,6 +15,9 @@ const (
 	watcherActionDie     = "die"
 )
 
+// Watcher watches for "start", "die" container
+// events in Docker and exposes them via the Events()
+// method.
 type Watcher interface {
 	Events() <-chan WatchEvent
 	Shutdown()

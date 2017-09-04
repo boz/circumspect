@@ -10,6 +10,8 @@ import (
 
 var ErrNotRunning = errors.New("no longer running")
 
+// Container inspects the given container id and submits the results to the registry.
+// When the container is shut down it removes itself from the registry
 type Container interface {
 	ID() string
 	Refresh() error

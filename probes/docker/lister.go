@@ -9,12 +9,14 @@ import (
 )
 
 const (
-	defaultPeriod  = 5 * time.Second
+	defaultPeriod  = 10 * time.Second
 	defaultTimeout = 5 * time.Second
 )
 
+// Lister periodically fetches the complete list
+// of running containers and sends them to the `Containers()` channel.
 type Lister interface {
-	Events() <-chan []ListEvent
+	Containers() <-chan []types.Container
 	Shutdown()
 	Done() <-chan struct{}
 }
@@ -24,13 +26,12 @@ func NewLister(ctx context.Context, client *client.Client) Lister {
 	ctx, cancel := context.WithCancel(ctx)
 
 	lister := &lister{
-		client:  client,
-		current: make(map[string]types.Container),
-		period:  defaultPeriod,
-		eventch: make(chan []ListEvent),
-		donech:  make(chan struct{}),
-		cancel:  cancel,
-		ctx:     ctx,
+		client: client,
+		period: defaultPeriod,
+		outch:  make(chan []types.Container),
+		donech: make(chan struct{}),
+		cancel: cancel,
+		ctx:    ctx,
 	}
 
 	go lister.run()
@@ -40,21 +41,18 @@ func NewLister(ctx context.Context, client *client.Client) Lister {
 
 type lister struct {
 	client *client.Client
-
-	current map[string]types.Container
-
 	period time.Duration
 
-	eventch chan []ListEvent
-	donech  chan struct{}
+	outch chan []types.Container
 
 	err    error
+	donech chan struct{}
 	cancel context.CancelFunc
 	ctx    context.Context
 }
 
-func (l *lister) Events() <-chan []ListEvent {
-	return l.eventch
+func (l *lister) Containers() <-chan []types.Container {
+	return l.outch
 }
 
 func (l *lister) Shutdown() {
@@ -70,13 +68,11 @@ func (l *lister) run() {
 	defer close(l.donech)
 	defer l.cancel()
 
-	current := l.current
-
 	var ticker *time.Timer
 	var tickch <-chan time.Time
 
-	var events []ListEvent
-	var eventch chan []ListEvent
+	var containers []types.Container
+	var outch chan []types.Container
 
 	runner := newListRunner(l.ctx, l.client)
 	runnerch := runner.Done()
@@ -91,18 +87,17 @@ loop:
 			break loop
 
 		case <-runnerch:
-
 			if err := runner.Err(); err != nil {
 				l.err = err
 				break loop
 			}
 
-			current, events = updateCache(l.current, runner.Result().([]types.Container))
+			containers = filterContainers(runner.Result().([]types.Container))
 
-			if len(events) > 0 {
-				eventch = l.eventch
+			if len(containers) > 0 {
+				outch = l.outch
 			} else {
-				eventch = nil
+				outch = nil
 			}
 
 			runner = nil
@@ -117,10 +112,10 @@ loop:
 			runner = newListRunner(l.ctx, l.client)
 			runnerch = runner.Done()
 
-		case eventch <- events:
-			events = nil
-			eventch = nil
-			l.current = current
+		case outch <- containers:
+
+			containers = nil
+			outch = nil
 
 		}
 
@@ -146,42 +141,18 @@ func newListRunner(ctx context.Context, client *client.Client) Runner {
 	})
 }
 
-func updateCache(prev map[string]types.Container, containers []types.Container) (map[string]types.Container, []ListEvent) {
-	current := make(map[string]types.Container)
+func filterContainers(containers []types.Container) []types.Container {
+	var filtered []types.Container
 
-	var events []ListEvent
-
-	for _, c := range containers {
-		if !acceptContainer(c) {
-			continue
-		}
-
-		current[c.ID] = c
-
-		if _, ok := prev[c.ID]; !ok {
-			events = append(events, NewListEvent(EventTypeCreate, c))
+	for _, container := range containers {
+		if acceptContainer(container) {
+			filtered = append(filtered, container)
 		}
 	}
 
-	for id, c := range prev {
-		if _, ok := current[id]; !ok {
-			events = append(events, NewListEvent(EventTypeDelete, c))
-		}
-	}
-
-	return current, events
+	return filtered
 }
 
-type ListEvent struct {
-	Type      EventType
-	ID        string
-	Container types.Container
-}
-
-func NewListEvent(t EventType, c types.Container) ListEvent {
-	return ListEvent{t, c.ID, c}
-}
-
-func acceptContainer(c types.Container) bool {
-	return c.State == "running"
+func acceptContainer(container types.Container) bool {
+	return container.State == "running"
 }
