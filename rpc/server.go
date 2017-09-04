@@ -2,66 +2,58 @@ package rpc
 
 import (
 	"errors"
-	"log"
 	"net"
-	"os"
-	"syscall"
 
 	context "golang.org/x/net/context"
 
-	"github.com/boz/circumspect/probes/docker"
-	udsgrpc "github.com/boz/circumspect/probes/uds/grpc"
+	udsgrpc "github.com/boz/circumspect/resolver/uds/grpc"
+	"github.com/sirupsen/logrus"
 	grpc "google.golang.org/grpc"
 )
 
-func RunServer(log *log.Logger, path string) error {
+var log = logrus.StandardLogger().WithField("package", "rpc")
 
-	// delete socket if present
-	syscall.Unlink(path)
+func RunServer(ctx context.Context, path string, fn func(context.Context, int)) error {
+	log = log.WithField("component", "server")
 
 	sock, err := net.Listen("unix", path)
 	if err != nil {
-		log.Printf("error listening on %v: %v", path, err)
+		log.WithError(err).Errorf("error listening on %v", path)
 		return err
 	}
-	defer sock.Close()
 
-	docker, err := docker.NewService(context.Background())
-	if err != nil {
-		return err
-	}
+	donech := make(chan struct{})
+	defer func() { <-donech }()
+
+	go func() {
+		defer close(donech)
+		<-ctx.Done()
+		sock.Close()
+	}()
 
 	s := grpc.NewServer(grpc.Creds(udsgrpc.NewCredentials()))
 
-	RegisterWorkloadServer(s, &server{log, docker})
+	RegisterWorkloadServer(s, &server{log, fn})
 
 	return s.Serve(sock)
 }
 
 type server struct {
-	log    *log.Logger
-	docker docker.Service
+	log logrus.FieldLogger
+	fn  func(context.Context, int)
 }
 
 func (s *server) Register(ctx context.Context, req *Request) (*Response, error) {
 	props, ok := udsgrpc.PropsFromContext(ctx)
 
 	if !ok {
-		s.log.Printf("no properties for peer")
+		s.log.Warnf("no properties for peer")
 		return &Response{}, errors.New("no peer properties")
 	}
 
-	s.log.Printf("register request from [pid: %v uid: %v gid: %v]", props.Pid(), props.Uid(), props.Gid())
+	s.log.Debugf("register request from [pid: %v uid: %v gid: %v]", props.Pid(), props.Uid(), props.Gid())
 
-	dprops, err := s.docker.Lookup(ctx, props)
-	if err != nil {
-		s.log.Printf("error getting docker properties: %v", err)
-		return &Response{}, err
-	}
-
-	log.Printf("found docker container %v", dprops.DockerID())
-
-	docker.PrintProps(os.Stdout, dprops)
+	s.fn(ctx, props.Pid())
 
 	return &Response{}, nil
 }

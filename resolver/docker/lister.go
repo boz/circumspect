@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 )
 
@@ -21,12 +22,13 @@ type Lister interface {
 	Done() <-chan struct{}
 }
 
-func NewLister(ctx context.Context, client *client.Client) Lister {
+func NewLister(ctx context.Context, client *client.Client, filter filters.Args) Lister {
 
 	ctx, cancel := context.WithCancel(ctx)
 
 	lister := &lister{
 		client: client,
+		filter: filter,
 		period: defaultPeriod,
 		outch:  make(chan []types.Container),
 		donech: make(chan struct{}),
@@ -41,6 +43,7 @@ func NewLister(ctx context.Context, client *client.Client) Lister {
 
 type lister struct {
 	client *client.Client
+	filter filters.Args
 	period time.Duration
 
 	outch chan []types.Container
@@ -74,7 +77,7 @@ func (l *lister) run() {
 	var containers []types.Container
 	var outch chan []types.Container
 
-	runner := newListRunner(l.ctx, l.client)
+	runner := newListRunner(l.ctx, l.client, l.filter)
 	runnerch := runner.Done()
 
 loop:
@@ -109,7 +112,7 @@ loop:
 		case <-tickch:
 			tickch = nil
 
-			runner = newListRunner(l.ctx, l.client)
+			runner = newListRunner(l.ctx, l.client, l.filter)
 			runnerch = runner.Done()
 
 		case outch <- containers:
@@ -132,10 +135,11 @@ loop:
 
 }
 
-func newListRunner(ctx context.Context, client *client.Client) Runner {
+func newListRunner(ctx context.Context, client *client.Client, filter filters.Args) Runner {
 	return NewRunner(ctx, func(ctx context.Context) (interface{}, error) {
 		options := types.ContainerListOptions{
-			All: true,
+			Filters: filter,
+			All:     true,
 		}
 		return client.ContainerList(ctx, options)
 	})

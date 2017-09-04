@@ -1,7 +1,6 @@
 package rpc
 
 import (
-	"log"
 	"net"
 	"time"
 
@@ -10,13 +9,14 @@ import (
 	grpc "google.golang.org/grpc"
 )
 
-func RunClient(log *log.Logger, path string) error {
+func RunClient(ctx context.Context, path string) error {
+	log = log.WithField("component", "client")
 
-	log.Printf("connecting to %v...", path)
+	log.Debugf("connecting to %v ...", path)
 
-	conn, err := grpc.Dial(path, grpc.WithInsecure(), grpc.WithDialer(dialer))
+	conn, err := grpc.DialContext(ctx, path, grpc.WithInsecure(), grpc.WithDialer(dialer))
 	if err != nil {
-		log.Printf("error connecting to %v: %v", path, err)
+		log.WithError(err).Errorf("error connecting to %v", path)
 		return err
 	}
 	defer conn.Close()
@@ -25,11 +25,9 @@ func RunClient(log *log.Logger, path string) error {
 
 	_, err = client.Register(context.Background(), &Request{})
 	if err != nil {
-		log.Printf("error registering: %v", err)
+		log.WithError(err).Error("error registering")
 		return err
 	}
-
-	log.Print("ok")
 
 	return nil
 }

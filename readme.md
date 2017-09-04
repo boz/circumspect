@@ -2,6 +2,10 @@
 
 Example grpc credentials which capture `{pid,uid,gid}` of client.
 
+```sh
+docker ps --quiet | xargs docker inspect --format '{{.State.Pid}}'
+```
+
 ### with vagrant
 
 ```sh

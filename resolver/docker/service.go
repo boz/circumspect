@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 )
 
@@ -28,21 +29,27 @@ type Service interface {
 
 func NewService(ctx context.Context) (Service, error) {
 
+	// todo: configurable
 	client, err := client.NewEnvClient()
 	if err != nil {
 		return nil, err
 	}
 
+	// todo: ensure server is on same machine+os
 	_, err = client.Ping(ctx)
 	if err != nil {
 		client.Close()
 		return nil, err
 	}
 
+	// todo: configurable
+	filter := filters.NewArgs()
+	filter.Add("status", "running")
+
 	ctx, cancel := context.WithCancel(ctx)
 
-	lister := NewLister(ctx, client)
-	watcher := NewWatcher(ctx, client)
+	lister := NewLister(ctx, client, filter)
+	watcher := NewWatcher(ctx, client, filter)
 	registry := NewRegistry(ctx)
 
 	svc := &service{

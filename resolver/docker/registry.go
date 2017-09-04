@@ -3,12 +3,19 @@ package docker
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	ps "github.com/mitchellh/go-ps"
 )
 
+const (
+	// todo: configurable
+	registryLookupTimeout = time.Second
+)
+
 var ErrInvalidPid = errors.New("Invalid PID")
+var ErrNotFound = errors.New("Not found")
 
 // Registry contains a set of running containers and
 // allows for finding which container a PID belongs to, if any.
@@ -46,7 +53,7 @@ type registry struct {
 type registryLookupRequest struct {
 	pid    int
 	ch     chan<- Props
-	donech chan struct{}
+	donech <-chan struct{}
 }
 
 func NewRegistry(ctx context.Context) Registry {
@@ -79,19 +86,19 @@ func (r *registry) Done() <-chan struct{} {
 }
 
 func (r *registry) Lookup(ctx context.Context, pid int) (Props, error) {
+	ctx, cancel := context.WithTimeout(ctx, registryLookupTimeout)
+	defer cancel()
 
 	ch := make(chan Props, 1)
-	donech := make(chan struct{})
-	defer close(donech)
 
-	req := &registryLookupRequest{pid, ch, donech}
+	req := &registryLookupRequest{pid, ch, ctx.Done()}
 
 	// submit request
 	select {
 	case <-r.ctx.Done():
 		return nil, ErrNotRunning
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return nil, ErrNotFound
 	case r.lookupch <- req:
 	}
 

@@ -2,10 +2,11 @@ package docker
 
 import (
 	"context"
-	"strconv"
+	"fmt"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/events"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 )
 
@@ -30,11 +31,12 @@ type WatchEvent struct {
 	ID   string
 }
 
-func NewWatcher(ctx context.Context, client *client.Client) Watcher {
+func NewWatcher(ctx context.Context, client *client.Client, filter filters.Args) Watcher {
 	ctx, cancel := context.WithCancel(ctx)
 
 	w := &watcher{
 		client:  client,
+		filter:  filter,
 		eventch: make(chan WatchEvent, watcherDefaultBufsiz),
 		donech:  make(chan struct{}),
 		cancel:  cancel,
@@ -48,6 +50,7 @@ func NewWatcher(ctx context.Context, client *client.Client) Watcher {
 
 type watcher struct {
 	client  *client.Client
+	filter  filters.Args
 	eventch chan WatchEvent
 	donech  chan struct{}
 	err     error
@@ -76,7 +79,9 @@ func (w *watcher) Err() error {
 func (w *watcher) run() {
 	defer close(w.donech)
 
-	options := types.EventsOptions{}
+	options := types.EventsOptions{
+		Filters: w.filter,
+	}
 
 	eventch, errch := w.client.Events(w.ctx, options)
 
@@ -95,7 +100,7 @@ loop:
 
 		case event := <-eventch:
 
-			options.Since = strconv.FormatInt(event.Time, 10)
+			options.Since = fmt.Sprintf("%d.%09d", event.Time, event.TimeNano)
 
 			if !watcherAcceptEvent(event) {
 				continue
