@@ -22,11 +22,9 @@ var ErrNotFound = errors.New("Not found")
 // allows for finding which container a PID belongs to, if any.
 type Registry interface {
 
-	// Lookup will try to find properties for the container that
-	// is running the given pid.
+	// Lookup will try to find the container that is running the given PID.
 	// If no container is found it will block until one becomes known
 	// or the given context has been cancelled.
-	// TODO: have a default timeout (~1s to start)
 	Lookup(ctx context.Context, pid int) (Props, error)
 
 	// Submit notifies the registry of a new or updated
@@ -43,7 +41,7 @@ type registry struct {
 	purgech  chan *registryLookup
 
 	// todo: optimize
-	pendingLookups []*registryLookup
+	waitingLookups []*registryLookup
 	containers     map[string]types.ContainerJSON
 
 	donech chan struct{}
@@ -157,8 +155,10 @@ loop:
 		}
 	}
 
-	// drain pending lookups
-	for len(r.pendingLookups) > 0 {
+	r.log.Debugf("draining %v lookups", len(r.waitingLookups))
+
+	// drain waiting lookups
+	for len(r.waitingLookups) > 0 {
 		r.purgeLookup(<-r.purgech)
 	}
 }
@@ -167,7 +167,7 @@ func (r *registry) doSubmit(c types.ContainerJSON) {
 	pid := c.State.Pid
 
 	// see if there are any lookups waiting for the PID of this container.
-	for _, lookup := range r.pendingLookups {
+	for _, lookup := range r.waitingLookups {
 		if lookup.accept(pid) {
 			lookup.resolve(c)
 		}
@@ -177,6 +177,9 @@ func (r *registry) doSubmit(c types.ContainerJSON) {
 }
 
 func (r *registry) doLookup(req *registryLookupRequest) {
+	log := log.WithField("request-pid", req.pid)
+	log.Debug("looking up container")
+
 	var pids []int
 
 	pid := req.pid
@@ -190,8 +193,7 @@ func (r *registry) doLookup(req *registryLookupRequest) {
 		for _, c := range r.containers {
 			if c.State.Pid == pid {
 
-				r.log.WithField("pid", pid).
-					WithField("request-pid", req.pid).
+				log.WithField("pid", pid).
 					WithField("docker-id", c.ID).
 					Debugf("match found")
 
@@ -218,13 +220,15 @@ func (r *registry) doLookup(req *registryLookupRequest) {
 		return
 	}
 
+	log.Debug("no match found.  waiting for new containers")
+
 	// no containers were found.
 	// save all pid generations and wait for a new
 	// container to be submitted that matches
 
-	lookup := &registryLookup{req, pids, log.WithField("request-pid", req.pid)}
+	lookup := &registryLookup{req, pids, log.WithField("waiting", true)}
 
-	r.pendingLookups = append(r.pendingLookups, lookup)
+	r.waitingLookups = append(r.waitingLookups, lookup)
 
 	go func() {
 		<-req.donech
@@ -234,11 +238,11 @@ func (r *registry) doLookup(req *registryLookupRequest) {
 }
 
 func (r *registry) purgeLookup(lookup *registryLookup) {
-	r.log.WithField("pid", lookup.request.pid).Debugf("purging lookup")
+	r.log.WithField("request-pid", lookup.request.pid).Debugf("purging lookup")
 
-	for idx, item := range r.pendingLookups {
+	for idx, item := range r.waitingLookups {
 		if item == lookup {
-			r.pendingLookups = append(r.pendingLookups[:idx], r.pendingLookups[idx+1:]...)
+			r.waitingLookups = append(r.waitingLookups[:idx], r.waitingLookups[idx+1:]...)
 			return
 		}
 	}

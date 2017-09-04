@@ -14,7 +14,7 @@ import (
 var log = logrus.StandardLogger().WithField("package", "rpc")
 
 func RunServer(ctx context.Context, path string, fn func(context.Context, int)) error {
-	log = log.WithField("component", "server")
+	log := log.WithField("component", "server")
 
 	sock, err := net.Listen("unix", path)
 	if err != nil {
