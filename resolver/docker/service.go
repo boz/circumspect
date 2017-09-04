@@ -6,7 +6,10 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+	"github.com/sirupsen/logrus"
 )
+
+var log = logrus.StandardLogger().WithField("package", "resolver/docker")
 
 type RequiredProps interface {
 	Pid() int
@@ -28,6 +31,7 @@ type Service interface {
 }
 
 func NewService(ctx context.Context) (Service, error) {
+	log := log.WithField("component", "service")
 
 	// todo: configurable
 	client, err := client.NewEnvClient()
@@ -36,11 +40,13 @@ func NewService(ctx context.Context) (Service, error) {
 	}
 
 	// todo: ensure server is on same machine+os
-	_, err = client.Ping(ctx)
+	ping, err := client.Ping(ctx)
 	if err != nil {
 		client.Close()
 		return nil, err
 	}
+
+	log.Debugf("connected to docker %#v", ping)
 
 	// todo: configurable
 	filter := filters.NewArgs()
@@ -62,6 +68,7 @@ func NewService(ctx context.Context) (Service, error) {
 		containerch:     make(chan Container),
 		staleContainers: make(map[string]Container),
 
+		log:    log,
 		cancel: cancel,
 		ctx:    ctx,
 		donech: make(chan struct{}),
@@ -84,6 +91,7 @@ type service struct {
 	// Containers that have been missing from one lister.Containers() delivery
 	staleContainers map[string]Container
 
+	log    logrus.FieldLogger
 	donech chan struct{}
 	cancel context.CancelFunc
 	ctx    context.Context
@@ -104,24 +112,31 @@ func (s *service) Done() <-chan struct{} {
 
 func (s *service) run() {
 	defer close(s.donech)
+	defer s.log.Debug("done")
 
 loop:
 	for {
 		select {
 
 		case <-s.ctx.Done():
+			s.log.Debug("context cancelled")
 			break loop
 
 		case <-s.lister.Done():
+			s.log.Warn("early lister copletion")
 			break loop
 
 		case <-s.watcher.Done():
+			s.log.Warn("early watcher copletion")
 			break loop
 
 		case <-s.registry.Done():
+			s.log.Warn("early registry copletion")
 			break loop
 
 		case c := <-s.containerch:
+			s.log.WithField("docker-id", c.ID()).
+				Debug("container complete")
 
 			delete(s.containers, c.ID())
 			delete(s.staleContainers, c.ID())
@@ -131,15 +146,21 @@ loop:
 
 		case event := <-s.watcher.Events():
 			s.handleWatchEvent(event)
-
 		}
 	}
 
 	s.cancel()
 
+	s.log.Debugf("draining %v containers", len(s.containers))
+
 	// drain containers
 	for len(s.containers) > 0 {
+
 		c := <-s.containerch
+
+		s.log.WithField("docker-id", c.ID()).
+			Debug("container drained")
+
 		delete(s.containers, c.ID())
 		delete(s.staleContainers, c.ID())
 	}
@@ -155,6 +176,9 @@ loop:
 // be marked as "stale".
 // If a "stale" container is not in the list, it will be shut down.
 func (s *service) handleContainerList(containers []types.Container) {
+	s.log.WithField("active", len(s.containers)).
+		WithField("stale", len(s.staleContainers)).
+		Debugf("updating with %v containers", len(containers))
 
 	newset := make(map[string]bool)
 
@@ -184,6 +208,7 @@ func (s *service) handleContainerList(containers []types.Container) {
 
 		// already stale once. purge.
 		if _, ok := s.staleContainers[id]; ok {
+			s.log.WithField("docker-id", id).Debug("shutting down stale container")
 			c.Shutdown()
 			continue
 		}
@@ -191,10 +216,10 @@ func (s *service) handleContainerList(containers []types.Container) {
 		// queue up to be purged on the next list
 		s.staleContainers[id] = c
 	}
-
 }
 
 func (s *service) handleWatchEvent(event WatchEvent) {
+	s.log.WithField("docker-id", event.ID).Debugf("watcher event received: %v")
 	switch event.Type {
 	case EventTypeCreate, EventTypeUpdate:
 		s.refreshContainer(event.ID)
@@ -218,6 +243,8 @@ func (s *service) purgeContainer(id string) {
 }
 
 func (s *service) createContainer(id string) {
+	log := s.log.WithField("docker-id", id)
+	log.Debug("creating container")
 
 	c := NewContainer(s.ctx, s.client, s.registry, id)
 	s.containers[c.ID()] = c

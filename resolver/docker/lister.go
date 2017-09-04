@@ -7,6 +7,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -23,6 +24,7 @@ type Lister interface {
 }
 
 func NewLister(ctx context.Context, client *client.Client, filter filters.Args) Lister {
+	log := log.WithField("component", "lister")
 
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -32,6 +34,7 @@ func NewLister(ctx context.Context, client *client.Client, filter filters.Args) 
 		period: defaultPeriod,
 		outch:  make(chan []types.Container),
 		donech: make(chan struct{}),
+		log:    log,
 		cancel: cancel,
 		ctx:    ctx,
 	}
@@ -50,6 +53,7 @@ type lister struct {
 
 	err    error
 	donech chan struct{}
+	log    logrus.FieldLogger
 	cancel context.CancelFunc
 	ctx    context.Context
 }
@@ -70,6 +74,7 @@ func (l *lister) Done() <-chan struct{} {
 func (l *lister) run() {
 	defer close(l.donech)
 	defer l.cancel()
+	defer l.log.Debug("done")
 
 	var ticker *time.Timer
 	var tickch <-chan time.Time
@@ -91,11 +96,14 @@ loop:
 
 		case <-runnerch:
 			if err := runner.Err(); err != nil {
+				l.log.WithError(err).Error("runner failed")
 				l.err = err
 				break loop
 			}
 
 			containers = filterContainers(runner.Result().([]types.Container))
+
+			l.log.Debug("list complete: %v containers found", len(containers))
 
 			if len(containers) > 0 {
 				outch = l.outch
@@ -112,10 +120,12 @@ loop:
 		case <-tickch:
 			tickch = nil
 
+			l.log.Debug("starting runner")
 			runner = newListRunner(l.ctx, l.client, l.filter)
 			runnerch = runner.Done()
 
 		case outch <- containers:
+			l.log.Debugf("%v containers delivered", len(containers))
 
 			containers = nil
 			outch = nil
@@ -129,10 +139,10 @@ loop:
 	}
 
 	if runner != nil {
+		l.log.Debug("draining runner")
 		<-runner.Done()
 		l.err = runner.Err()
 	}
-
 }
 
 func newListRunner(ctx context.Context, client *client.Client, filter filters.Args) Runner {

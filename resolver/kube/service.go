@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/sirupsen/logrus"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -16,6 +18,8 @@ var (
 	ErrContainerNotRecognized = errors.New("container not recognized")
 	ErrInvalidPodUID          = errors.New("invalid pod UID")
 	ErrInvalidContainerID     = errors.New("invalid container ID")
+
+	log = logrus.StandardLogger().WithField("package", "resolver/kube")
 )
 
 type RequiredProps interface {
@@ -60,16 +64,28 @@ func (s *service) Done() <-chan struct{} {
 }
 
 func (s *service) Lookup(ctx context.Context, dprops RequiredProps) (Props, error) {
-	// todo: use given ctx for kube api call
+	log := log.WithField("docker-id", dprops.DockerID())
 
+	log.Debug("resolving pod...")
+
+	// todo: use given ctx for kube api call
 	pod, cs, err := podFromDockerLabels(s.client, dprops.DockerLabels())
 	if err != nil {
+		log.Debug("no pod found")
 		return nil, err
 	}
 
+	log = log.
+		WithField("kube-ns", pod.Namespace).
+		WithField("kube-pod", pod.Name).
+		WithField("kube-container", cs.Name)
+
 	if cs.ContainerID != dprops.DockerID() {
+		log.WithField("kube-container", cs.ContainerID).Warn("container ID mismatch")
 		return nil, ErrInvalidContainerID
 	}
+
+	log.Debug("pod found for container")
 
 	return newProps(pod, cs), nil
 }

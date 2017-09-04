@@ -14,7 +14,13 @@ func RunClient(ctx context.Context, path string) error {
 
 	log.Debugf("connecting to %v ...", path)
 
+	dialer := func(addr string, timeout time.Duration) (net.Conn, error) {
+		d := net.Dialer{Timeout: timeout}
+		return d.DialContext(ctx, "unix", addr)
+	}
+
 	conn, err := grpc.DialContext(ctx, path, grpc.WithInsecure(), grpc.WithDialer(dialer))
+
 	if err != nil {
 		log.WithError(err).Errorf("error connecting to %v", path)
 		return err
@@ -23,15 +29,11 @@ func RunClient(ctx context.Context, path string) error {
 
 	client := NewWorkloadClient(conn)
 
-	_, err = client.Register(context.Background(), &Request{})
+	_, err = client.Register(ctx, &Request{})
 	if err != nil {
 		log.WithError(err).Error("error registering")
 		return err
 	}
 
 	return nil
-}
-
-func dialer(addr string, timeout time.Duration) (net.Conn, error) {
-	return net.DialTimeout("unix", addr, timeout)
 }

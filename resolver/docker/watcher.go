@@ -8,6 +8,7 @@ import (
 	"github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -39,6 +40,7 @@ func NewWatcher(ctx context.Context, client *client.Client, filter filters.Args)
 		filter:  filter,
 		eventch: make(chan WatchEvent, watcherDefaultBufsiz),
 		donech:  make(chan struct{}),
+		log:     log.WithField("component", "watcher"),
 		cancel:  cancel,
 		ctx:     ctx,
 	}
@@ -54,6 +56,7 @@ type watcher struct {
 	eventch chan WatchEvent
 	donech  chan struct{}
 	err     error
+	log     logrus.FieldLogger
 	cancel  context.CancelFunc
 	ctx     context.Context
 }
@@ -78,6 +81,7 @@ func (w *watcher) Err() error {
 
 func (w *watcher) run() {
 	defer close(w.donech)
+	defer w.log.Debug("done")
 
 	options := types.EventsOptions{
 		Filters: w.filter,
@@ -92,7 +96,8 @@ loop:
 		case <-w.ctx.Done():
 			break loop
 
-		case <-errch:
+		case err := <-errch:
+			log.WithError(err).Warn("docker watch ended")
 
 			// todo: throttle retries, die after x consecutive
 
@@ -123,11 +128,9 @@ loop:
 
 		}
 	}
-
 	w.cancel()
 
 	<-errch
-
 }
 
 func watcherAcceptEvent(event events.Message) bool {

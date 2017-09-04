@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -40,12 +39,6 @@ var (
 			Ints()
 )
 
-func usage() {
-	fmt.Fprintf(os.Stderr, "usage: %v <client|server|docker> [ -s socket-path ]\n", os.Args[0])
-	flag.PrintDefaults()
-	os.Exit(1)
-}
-
 func main() {
 
 	kingpin.CommandLine.HelpFlag.Short('h')
@@ -63,14 +56,9 @@ func main() {
 	rset := openResolver(ctx)
 
 	defer rset.Shutdown()
-
 	defer cancel()
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		watchSignals(ctx, cancel)
-	}()
+	watchSignals(ctx, cancel, &wg)
 
 	switch command {
 	case "client":
@@ -89,16 +77,21 @@ func configureLogger() {
 	logrus.StandardLogger().Level = level
 }
 
-func watchSignals(ctx context.Context, cancel context.CancelFunc) {
-	sigch := make(chan os.Signal, 1)
-	signal.Notify(sigch, syscall.SIGINT, syscall.SIGHUP)
-	defer signal.Stop(sigch)
+func watchSignals(
+	ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup) {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		sigch := make(chan os.Signal, 1)
+		signal.Notify(sigch, syscall.SIGINT, syscall.SIGHUP)
+		defer signal.Stop(sigch)
 
-	select {
-	case <-ctx.Done():
-	case <-sigch:
-		cancel()
-	}
+		select {
+		case <-ctx.Done():
+		case <-sigch:
+			cancel()
+		}
+	}()
 }
 
 func openResolver(ctx context.Context) resolver.Set {

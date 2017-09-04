@@ -6,6 +6,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
+	"github.com/sirupsen/logrus"
 )
 
 var ErrNotRunning = errors.New("no longer running")
@@ -20,6 +21,8 @@ type Container interface {
 }
 
 func NewContainer(ctx context.Context, client *client.Client, registry Registry, id string) Container {
+	log := log.WithField("docker-id", id).WithField("component", "container")
+
 	ctx, cancel := context.WithCancel(ctx)
 
 	c := &container{
@@ -28,6 +31,7 @@ func NewContainer(ctx context.Context, client *client.Client, registry Registry,
 		registry:  registry,
 		refreshch: make(chan struct{}),
 		donech:    make(chan struct{}),
+		log:       log,
 		cancel:    cancel,
 		ctx:       ctx,
 	}
@@ -43,6 +47,7 @@ type container struct {
 	registry  Registry
 	refreshch chan struct{}
 	donech    chan struct{}
+	log       logrus.FieldLogger
 	cancel    context.CancelFunc
 	ctx       context.Context
 }
@@ -70,6 +75,7 @@ func (c *container) Done() <-chan struct{} {
 
 func (c *container) run() {
 	defer close(c.donech)
+	defer c.log.Debug("done")
 
 	runner := newContainerRunner(c.ctx, c.client, c.id)
 	runnerch := runner.Done()
@@ -84,11 +90,22 @@ loop:
 		case <-runnerch:
 
 			if err := runner.Err(); err != nil {
+				c.log.WithError(err).Warn("runner failed")
 				// todo: handle error
 				continue
 			}
 
 			result := runner.Result().(types.ContainerJSON)
+
+			if result.State == nil {
+				c.log.Warn("incomplete state")
+				continue
+			}
+
+			c.log.WithField("status", result.State.Status).
+				WithField("running", result.State.Running).
+				WithField("pid", result.State.Pid).
+				Debug("runner complete")
 
 			c.registry.Submit(result)
 
@@ -101,6 +118,8 @@ loop:
 				// todo: schedule in the future?
 				continue
 			}
+
+			c.log.Debug("beginning refresh")
 
 			// todo: throttle
 			runner = newContainerRunner(c.ctx, c.client, c.id)

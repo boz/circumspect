@@ -7,6 +7,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	ps "github.com/mitchellh/go-ps"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -46,6 +47,7 @@ type registry struct {
 	containers     map[string]types.ContainerJSON
 
 	donech chan struct{}
+	log    logrus.FieldLogger
 	cancel context.CancelFunc
 	ctx    context.Context
 }
@@ -59,6 +61,8 @@ type registryLookupRequest struct {
 func NewRegistry(ctx context.Context) Registry {
 	ctx, cancel := context.WithCancel(ctx)
 
+	log := log.WithField("component", "registry")
+
 	r := &registry{
 		lookupch: make(chan *registryLookupRequest),
 		submitch: make(chan types.ContainerJSON),
@@ -67,6 +71,7 @@ func NewRegistry(ctx context.Context) Registry {
 		containers: make(map[string]types.ContainerJSON),
 
 		donech: make(chan struct{}),
+		log:    log,
 		cancel: cancel,
 		ctx:    ctx,
 	}
@@ -130,6 +135,7 @@ func (r *registry) Submit(c types.ContainerJSON) error {
 
 func (r *registry) run() {
 	defer close(r.donech)
+	defer r.log.Debug("done")
 
 loop:
 	for {
@@ -155,7 +161,6 @@ loop:
 	for len(r.pendingLookups) > 0 {
 		r.purgeLookup(<-r.purgech)
 	}
-
 }
 
 func (r *registry) doSubmit(c types.ContainerJSON) {
@@ -184,6 +189,12 @@ func (r *registry) doLookup(req *registryLookupRequest) {
 
 		for _, c := range r.containers {
 			if c.State.Pid == pid {
+
+				r.log.WithField("pid", pid).
+					WithField("request-pid", req.pid).
+					WithField("docker-id", c.ID).
+					Debugf("match found")
+
 				req.ch <- makeProps(c)
 				return
 			}
@@ -211,7 +222,7 @@ func (r *registry) doLookup(req *registryLookupRequest) {
 	// save all pid generations and wait for a new
 	// container to be submitted that matches
 
-	lookup := &registryLookup{req, pids}
+	lookup := &registryLookup{req, pids, log.WithField("request-pid", req.pid)}
 
 	r.pendingLookups = append(r.pendingLookups, lookup)
 
@@ -223,6 +234,8 @@ func (r *registry) doLookup(req *registryLookupRequest) {
 }
 
 func (r *registry) purgeLookup(lookup *registryLookup) {
+	r.log.WithField("pid", lookup.request.pid).Debugf("purging lookup")
+
 	for idx, item := range r.pendingLookups {
 		if item == lookup {
 			r.pendingLookups = append(r.pendingLookups[:idx], r.pendingLookups[idx+1:]...)
@@ -234,6 +247,7 @@ func (r *registry) purgeLookup(lookup *registryLookup) {
 type registryLookup struct {
 	request *registryLookupRequest
 	pids    []int
+	log     logrus.FieldLogger
 }
 
 func (lookup *registryLookup) accept(pid int) bool {
@@ -246,6 +260,9 @@ func (lookup *registryLookup) accept(pid int) bool {
 }
 
 func (lookup *registryLookup) resolve(c types.ContainerJSON) {
+	lookup.log.WithField("pid", c.State.Pid).
+		WithField("docker-id", c.ID).
+		Debugf("match found")
 	select {
 	case lookup.request.ch <- makeProps(c):
 	case <-lookup.request.donech:
