@@ -123,15 +123,15 @@ loop:
 			break loop
 
 		case <-s.lister.Done():
-			s.log.Warn("early lister copletion")
+			s.log.Debug("early lister copletion")
 			break loop
 
 		case <-s.watcher.Done():
-			s.log.Warn("early watcher copletion")
+			s.log.Debug("early watcher copletion")
 			break loop
 
 		case <-s.registry.Done():
-			s.log.Warn("early registry copletion")
+			s.log.Debug("early registry copletion")
 			break loop
 
 		case c := <-s.containerch:

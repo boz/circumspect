@@ -1,14 +1,23 @@
 package uds
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/boz/circumspect/propset"
+)
 
 var (
 	ErrInvalidConnection = errors.New("invalid connection")
 	ErrNotSupported      = errors.New("unsupported host OS")
 )
 
-type Props interface {
+type PidProps interface {
 	Pid() int
+	PropSet() propset.PropSet
+}
+
+type Props interface {
+	PidProps
 	Uid() uint
 	Gid() uint
 }
@@ -33,4 +42,25 @@ func (p *props) Uid() uint {
 
 func (p *props) Gid() uint {
 	return p.gid
+}
+
+func (p *props) PropSet() propset.PropSet {
+	return propset.New().
+		AddInt("pid", p.Pid()).
+		AddInt("uid", int(p.Uid())).
+		AddInt("gid", int(p.Gid()))
+}
+
+func NewPidProps(pid int) PidProps {
+	return pidProps(pid)
+}
+
+type pidProps int
+
+func (p pidProps) Pid() int {
+	return int(p)
+}
+
+func (p pidProps) PropSet() propset.PropSet {
+	return propset.New().AddInt("pid", int(p))
 }

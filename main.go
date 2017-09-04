@@ -8,9 +8,9 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/boz/circumspect/resolver"
-	"github.com/boz/circumspect/resolver/docker"
-	"github.com/boz/circumspect/resolver/kube"
+	"github.com/boz/circumspect/discovery"
+	"github.com/boz/circumspect/propset"
+	"github.com/boz/circumspect/resolver/uds"
 	"github.com/boz/circumspect/rpc"
 	"github.com/sirupsen/logrus"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
@@ -21,6 +21,14 @@ var (
 			Short('l').
 			Default("info").
 			Enum("debug", "info", "warn", "error")
+
+	flagEnableDocker = kingpin.Flag("docker", "enable docker discovery").
+				Default("true").
+				Bool()
+
+	flagEnableKube = kingpin.Flag("kube", "enable kube discovery").
+			Default("false").
+			Bool()
 
 	cmdClient        = kingpin.Command("client", "run rpc client")
 	flagClientSocket = cmdClient.Flag("socket", "rpc socket path").
@@ -52,17 +60,19 @@ func main() {
 	defer wg.Wait()
 
 	ctx, cancel := context.WithCancel(context.Background())
+	watchSignals(ctx, cancel, &wg)
+
+	if command == "client" {
+		defer cancel()
+		runClient(ctx)
+		return
+	}
 
 	rset := openResolver(ctx)
-
 	defer rset.Shutdown()
 	defer cancel()
 
-	watchSignals(ctx, cancel, &wg)
-
 	switch command {
-	case "client":
-		runClient(ctx, rset)
 	case "server":
 		runServer(ctx, rset)
 	case "pid":
@@ -94,31 +104,24 @@ func watchSignals(
 	}()
 }
 
-func openResolver(ctx context.Context) resolver.Set {
-	docker, err := docker.NewService(ctx)
-	kingpin.FatalIfError(err, "error opening docker resolver")
-
-	kube, err := kube.NewService(ctx)
-	if err != nil {
-		docker.Shutdown()
-		kingpin.FatalIfError(err, "error opening kube resolver")
-	}
-
-	return resolver.NewSet(docker, kube)
+func openResolver(ctx context.Context) discovery.Strategy {
+	discovery, err := discovery.Build(ctx, *flagEnableDocker, *flagEnableKube)
+	kingpin.FatalIfError(err, "error opening discovery")
+	return discovery
 }
 
-func runClient(ctx context.Context, _ resolver.Set) {
+func runClient(ctx context.Context) {
 	rpc.RunClient(ctx, *flagClientSocket)
 }
 
-func runServer(ctx context.Context, rset resolver.Set) {
-	rpc.RunServer(ctx, *flagServerSocket, func(ctx context.Context, pid int) {
-		props, err := rset.Lookup(ctx, pid)
-		displayProps(pid, props, err)
+func runServer(ctx context.Context, rset discovery.Strategy) {
+	rpc.RunServer(ctx, *flagServerSocket, func(ctx context.Context, props uds.Props) {
+		pset, err := rset.Lookup(ctx, props)
+		displayProps(props, pset, err)
 	})
 }
 
-func runPid(ctx context.Context, rset resolver.Set) {
+func runPid(ctx context.Context, rset discovery.Strategy) {
 	var wg sync.WaitGroup
 
 	wg.Add(len(*flagPids))
@@ -126,8 +129,9 @@ func runPid(ctx context.Context, rset resolver.Set) {
 	for _, pid := range *flagPids {
 		go func(pid int) {
 			defer wg.Done()
-			props, err := rset.Lookup(ctx, pid)
-			displayProps(pid, props, err)
+			props := uds.NewPidProps(pid)
+			pset, err := rset.Lookup(ctx, props)
+			displayProps(props, pset, err)
 		}(pid)
 	}
 
@@ -136,32 +140,11 @@ func runPid(ctx context.Context, rset resolver.Set) {
 
 var printMtx = &sync.Mutex{}
 
-func displayProps(pid int, props resolver.Props, err error) {
+func displayProps(pprops uds.PidProps, pset propset.PropSet, err error) {
 	printMtx.Lock()
 	defer printMtx.Unlock()
 
-	fmt.Printf("\npid %v\n", pid)
-
-	dprops := props.Docker()
-	if dprops == nil {
-		fmt.Printf("docker: no properties\n")
-	} else {
-		fmt.Printf("DockerID: %v\n", dprops.DockerID())
-		fmt.Printf("DockerPid: %v\n", dprops.DockerPid())
-		fmt.Printf("DockerImage: %v\n", dprops.DockerImage())
-		fmt.Printf("DockerPath: %v\n", dprops.DockerPath())
-		fmt.Printf("DockerLabels: %v\n", dprops.DockerLabels())
-	}
-
-	kprops := props.Kube()
-	if kprops == nil {
-		fmt.Printf("kube: no properties\n")
-	} else {
-		fmt.Printf("KubeNamespace: %v\n", kprops.KubeNamespace())
-		fmt.Printf("KubePodName: %v\n", kprops.KubePodName())
-		fmt.Printf("KubeLabels: %v\n", kprops.KubeLabels())
-		fmt.Printf("KubeAnnotations: %v\n", kprops.KubeAnnotations())
-		fmt.Printf("KubeContainerName: %v\n", kprops.KubeContainerName())
-	}
+	fmt.Printf("\nprocess %v properties:\n\n", pprops.Pid())
+	propset.Fprint(os.Stdout, pset)
 
 }

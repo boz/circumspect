@@ -1,9 +1,7 @@
 package docker
 
 import (
-	"fmt"
-	"io"
-
+	"github.com/boz/circumspect/propset"
 	"github.com/docker/docker/api/types"
 )
 
@@ -13,6 +11,8 @@ type Props interface {
 	DockerImage() string
 	DockerPath() string
 	DockerLabels() map[string]string
+
+	PropSet() propset.PropSet
 }
 
 type makeProps types.ContainerJSON
@@ -37,9 +37,11 @@ func (p makeProps) DockerLabels() map[string]string {
 	return p.Config.Labels
 }
 
-func PrintProps(w io.Writer, props Props) {
-	fmt.Fprintf(w, "Docker ID: %v\n", props.DockerID())
-	fmt.Fprintf(w, "Docker Image: %v\n", props.DockerImage())
-	fmt.Fprintf(w, "Docker Path: %v\n", props.DockerPath())
-	fmt.Fprintf(w, "Docker Labels: %#v\n", props.DockerLabels())
+func (p makeProps) PropSet() propset.PropSet {
+	return propset.New().
+		AddString("docker-id", p.DockerID()).
+		AddInt("docker-pid", p.DockerPid()).
+		AddString("docker-image", p.DockerImage()).
+		AddString("docker-path", p.DockerPath()).
+		AddMap("docker-labels", p.DockerLabels())
 }

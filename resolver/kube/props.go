@@ -1,6 +1,9 @@
 package kube
 
-import "k8s.io/api/core/v1"
+import (
+	"github.com/boz/circumspect/propset"
+	"k8s.io/api/core/v1"
+)
 
 type Props interface {
 	KubeNamespace() string
@@ -8,6 +11,8 @@ type Props interface {
 	KubeLabels() map[string]string
 	KubeAnnotations() map[string]string
 	KubeContainerName() string
+
+	PropSet() propset.PropSet
 }
 
 type props struct {
@@ -37,4 +42,13 @@ func (p props) KubeAnnotations() map[string]string {
 
 func (p props) KubeContainerName() string {
 	return p.cs.Name
+}
+
+func (p props) PropSet() propset.PropSet {
+	return propset.New().
+		AddString("kube-namespace", p.KubeNamespace()).
+		AddString("kube-pod-name", p.KubePodName()).
+		AddMap("kube-labels", p.KubeLabels()).
+		AddMap("kube-annotations", p.KubeAnnotations()).
+		AddString("kube-container-name", p.KubeContainerName())
 }

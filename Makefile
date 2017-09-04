@@ -22,6 +22,9 @@ proto:
 install-libs:
 	govendor build -i +local,^program
 
+integration: image
+	docker-compose up --build
+
 minikube-install-kubectl:
 	minikube ssh -- curl -LO https://storage.googleapis.com/kubernetes-release/release/$$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
 	minikube ssh -- chmod a+x ./kubectl
@@ -32,4 +35,6 @@ minikube-install-circumspect:
 clean:
 	rm circumspect circumspect-linux 2>/dev/null || true
 
-.PHONY: build build-linux image proto clean
+.PHONY: build build-linux image proto clean \
+	install-libs integration \
+	minikube-install-kubectl minikube-install-circumspect

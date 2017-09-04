@@ -205,7 +205,7 @@ func (r *registry) doLookup(req *registryLookupRequest) {
 		pids = append(pids, pid)
 
 		p, err := ps.FindProcess(pid)
-		if err != nil {
+		if err != nil || p == nil {
 			break
 		}
 

@@ -6,6 +6,7 @@ import (
 
 	context "golang.org/x/net/context"
 
+	"github.com/boz/circumspect/resolver/uds"
 	udsgrpc "github.com/boz/circumspect/resolver/uds/grpc"
 	"github.com/sirupsen/logrus"
 	grpc "google.golang.org/grpc"
@@ -13,7 +14,7 @@ import (
 
 var log = logrus.StandardLogger().WithField("package", "rpc")
 
-func RunServer(ctx context.Context, path string, fn func(context.Context, int)) error {
+func RunServer(ctx context.Context, path string, fn func(context.Context, uds.Props)) error {
 	log := log.WithField("component", "server")
 
 	sock, err := net.Listen("unix", path)
@@ -40,7 +41,7 @@ func RunServer(ctx context.Context, path string, fn func(context.Context, int)) 
 
 type server struct {
 	log logrus.FieldLogger
-	fn  func(context.Context, int)
+	fn  func(context.Context, uds.Props)
 }
 
 func (s *server) Register(ctx context.Context, req *Request) (*Response, error) {
@@ -53,7 +54,7 @@ func (s *server) Register(ctx context.Context, req *Request) (*Response, error) 
 
 	s.log.Debugf("register request from [pid: %v uid: %v gid: %v]", props.Pid(), props.Uid(), props.Gid())
 
-	s.fn(ctx, props.Pid())
+	s.fn(ctx, props)
 
 	return &Response{}, nil
 }
