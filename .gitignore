@@ -3,5 +3,6 @@
 /.vagrant
 /*.log
 /vendor/*
+/_build/*
 !/vendor/vendor.json
 

@@ -2,6 +2,11 @@ DOCKER_IMAGE ?= circumspect
 
 IMG_LDFLAGS := -w -linkmode external -extldflags "-static"
 
+# see https://github.com/kubernetes/minikube/pull/1542
+MINIKUBE_ISO_URL := https://storage.googleapis.com/minikube-builds/1542/minikube-testing.iso
+MINIKUBE_URL     := gs://minikube-builds/1542/minikube-$(shell uname -s | tr A-Z a-z)-amd64
+MINIKUBE         := _build/minikube
+
 build:
 	go build .
 
@@ -25,12 +30,23 @@ install-libs:
 integration: image
 	docker-compose up --build
 
-minikube-install-kubectl:
-	minikube ssh -- curl -LO https://storage.googleapis.com/kubernetes-release/release/$$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
-	minikube ssh -- chmod a+x ./kubectl
+$(MINIKUBE):
+	mkdir -p $(shell dirname $(MINIKUBE))
+	gsutil cp $(MINIKUBE_URL) $(MINIKUBE)
+	chmod a+x $(MINIKUBE)
 
-minikube-install-circumspect:
-	scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $$(minikube ssh-key) circumspect-linux docker@$$(minikube ip):
+minikube-start: $(MINIKUBE)
+	$(MINIKUBE) start --iso-url=$(MINIKUBE_ISO_URL)
+
+minikube-install-kubectl:
+	$(MINIKUBE) ssh -- curl -LO https://storage.googleapis.com/kubernetes-release/release/$$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+	$(MINIKUBE) ssh -- chmod a+x ./kubectl
+
+minikube-install-circumspect: build-linux
+	scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $$($(MINIKUBE) ssh-key) circumspect-linux docker@$$($(MINIKUBE) ip):circumspect
+
+minikube-install-image:
+	eval $$($(MINIKUBE) docker-env) && docker build -t $(DOCKER_IMAGE) .
 
 clean:
 	rm circumspect circumspect-linux 2>/dev/null || true
