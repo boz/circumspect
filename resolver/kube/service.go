@@ -200,6 +200,7 @@ func (s *service) Lookup(ctx context.Context, dprops RequiredProps) (Props, erro
 
 func (s *service) run() {
 	defer close(s.donech)
+	defer s.cancel()
 
 	log := s.log.WithField("method", "run")
 	defer log.Debug("done")
@@ -224,12 +225,11 @@ loop:
 			s.handleRecheck(pod)
 		}
 	}
-	s.cancel()
 
 	log.Debugf("draining %v pod request", len(s.requests))
 
 	for len(s.requests) > 0 {
-		s.handleRequest(<-s.reqdonech)
+		s.handleRequestDone(<-s.reqdonech)
 	}
 
 	<-cdonech
