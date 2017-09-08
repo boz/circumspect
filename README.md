@@ -37,9 +37,9 @@ docker-image   sha256:c32901baff489930b3ad0ad03ff709547452eee49cc6cfe1fe78af65f8
 docker-labels  foo  bar
 docker-path    ./circumspect
 docker-pid     4050
-gid            0
-pid            4050
-uid            0
+system-gid     0
+system-pid     4050
+system-uid     0
 ```
 
 ### Connect from a kubernetes pod
@@ -71,14 +71,14 @@ docker-labels        io.kubernetes.container.name                               
                      io.kubernetes.sandbox.id                                     85739086a895027958e2e2f77acc120da80d1229a0c2071f5eb6df88e81e873f
 docker-path          /bin/sh
 docker-pid           4323
-gid                  0
 kube-annotations     this-is-a-worker  true
 kube-container-name  worker-container
 kube-labels          foo  bar
 kube-namespace       default
 kube-pod-name        worker
-pid                  4386
-uid                  0
+system-gid           0
+system-pid           4386
+system-uid           0
 ```
 
 The [pod](_integration/pod.yml) connects every five seconds.  Stop it with

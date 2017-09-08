@@ -46,9 +46,9 @@ func (p *props) Gid() uint {
 
 func (p *props) PropSet() propset.PropSet {
 	return propset.New().
-		AddInt("pid", p.Pid()).
-		AddInt("uid", int(p.Uid())).
-		AddInt("gid", int(p.Gid()))
+		AddInt("system-pid", p.Pid()).
+		AddInt("system-uid", int(p.Uid())).
+		AddInt("system-gid", int(p.Gid()))
 }
 
 func NewPidProps(pid int) PidProps {
@@ -62,5 +62,5 @@ func (p pidProps) Pid() int {
 }
 
 func (p pidProps) PropSet() propset.PropSet {
-	return propset.New().AddInt("pid", int(p))
+	return propset.New().AddInt("system-pid", int(p))
 }
