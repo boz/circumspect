@@ -2,10 +2,11 @@ DOCKER_IMAGE ?= circumspect
 
 IMG_LDFLAGS := -w -linkmode external -extldflags "-static"
 
-# see https://github.com/kubernetes/minikube/pull/1542
-MINIKUBE_ISO_URL := https://storage.googleapis.com/minikube-builds/1542/minikube-testing.iso
-MINIKUBE_URL     := gs://minikube-builds/1542/minikube-$(shell uname -s | tr A-Z a-z)-amd64
-MINIKUBE         := _build/minikube
+MINIKUBE_URL := https://storage.googleapis.com/minikube/releases/latest/minikube-$(shell uname -s | tr A-Z a-z)-amd64
+MINIKUBE     := _build/minikube
+
+KUBECTL_VERSION = $(shell curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)
+KUBECTL_URL     = https://storage.googleapis.com/kubernetes-release/release/$(KUBECTL_VERSION)/bin/linux/amd64/kubectl
 
 build:
 	go build .
@@ -32,14 +33,14 @@ integration: image
 
 $(MINIKUBE):
 	mkdir -p $(shell dirname $(MINIKUBE))
-	gsutil cp $(MINIKUBE_URL) $(MINIKUBE)
+	curl -Lo $(MINIKUBE) $(MINIKUBE_URL)
 	chmod a+x $(MINIKUBE)
 
 minikube-start: $(MINIKUBE)
-	$(MINIKUBE) start --iso-url=$(MINIKUBE_ISO_URL)
+	$(MINIKUBE) start
 
 minikube-install-kubectl:
-	$(MINIKUBE) ssh -- curl -LO https://storage.googleapis.com/kubernetes-release/release/$$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+	$(MINIKUBE) ssh -- curl -LO $(KUBECTL_URL)
 	$(MINIKUBE) ssh -- chmod a+x ./kubectl
 
 minikube-install-circumspect: build-linux
@@ -53,4 +54,5 @@ clean:
 
 .PHONY: build build-linux image proto clean \
 	install-libs integration \
-	minikube-install-kubectl minikube-install-circumspect
+	$(MINIKUBE) minikube-install-kubectl \
+	minikube-install-circumspect minikube-install-image
