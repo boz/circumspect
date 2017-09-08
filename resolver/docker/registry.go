@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/engine-api/types"
 	ps "github.com/mitchellh/go-ps"
 	"github.com/sirupsen/logrus"
 )

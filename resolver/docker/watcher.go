@@ -2,12 +2,13 @@ package docker
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/events"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/client"
+	"github.com/docker/engine-api/client"
+	"github.com/docker/engine-api/types"
+	"github.com/docker/engine-api/types/events"
+	"github.com/docker/engine-api/types/filters"
 	"github.com/sirupsen/logrus"
 )
 
@@ -82,62 +83,55 @@ func (w *watcher) Err() error {
 func (w *watcher) run() {
 	defer close(w.donech)
 	defer w.log.Debug("done")
+	defer w.cancel()
 
 	options := types.EventsOptions{
 		Filters: w.filter,
 	}
 
-	eventch, errch := w.client.Events(w.ctx, options)
+	// todo: retry, throttle
+	stream, err := w.client.Events(w.ctx, options)
+	if err != nil {
+		log.WithError(err).Error("error getting events")
+		return
+	}
+	defer stream.Close()
 
-loop:
-	for {
+	var event events.Message
+
+	decoder := json.NewDecoder(stream)
+
+	for w.ctx.Err() == nil {
+
+		if err := decoder.Decode(&event); err != nil {
+			if w.ctx.Err() == nil {
+				log.WithError(err).Error("error decoding stream")
+			}
+			return
+		}
+
+		options.Since = fmt.Sprintf("%d.%09d", event.Time, event.TimeNano)
+
+		var wevent WatchEvent
+
+		switch event.Action {
+		case watcherActionStart:
+			wevent = WatchEvent{EventTypeCreate, event.Actor.ID}
+		case watcherActionDie:
+			wevent = WatchEvent{EventTypeDelete, event.Actor.ID}
+		}
+
 		select {
-
-		case <-w.ctx.Done():
-			break loop
-
-		case err := <-errch:
-			log.WithError(err).Warn("docker watch ended")
-
-			// todo: throttle retries, die after x consecutive
-
-			eventch, errch = w.client.Events(w.ctx, options)
-
-		case event := <-eventch:
-
-			options.Since = fmt.Sprintf("%d.%09d", event.Time, event.TimeNano)
-
-			if !watcherAcceptEvent(event) {
-				continue
-			}
-
-			var wevent WatchEvent
-
-			switch event.Action {
-			case watcherActionStart:
-				wevent = WatchEvent{EventTypeCreate, event.Actor.ID}
-			case watcherActionDie:
-				wevent = WatchEvent{EventTypeDelete, event.Actor.ID}
-			}
-
-			select {
-			case w.eventch <- wevent:
-			default:
-				// todo: warn dropping events
-			}
-
+		case w.eventch <- wevent:
+		default:
+			log.Warn("dropping event")
 		}
 	}
-	w.cancel()
-
-	<-errch
 }
 
 func watcherAcceptEvent(event events.Message) bool {
 	switch {
 	case event.Type != events.ContainerEventType:
-		return false
-	case event.Scope != "local":
 		return false
 	case event.Actor.ID == "":
 		return false

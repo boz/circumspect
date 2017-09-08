@@ -3,9 +3,9 @@ package docker
 import (
 	"context"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/client"
+	"github.com/docker/engine-api/client"
+	"github.com/docker/engine-api/types"
+	"github.com/docker/engine-api/types/filters"
 	"github.com/sirupsen/logrus"
 )
 
@@ -40,9 +40,8 @@ func NewService(ctx context.Context) (Service, error) {
 	}
 
 	// todo: ensure server is on same machine+os
-	ping, err := client.Ping(ctx)
+	ping, err := client.Info(ctx)
 	if err != nil {
-		client.Close()
 		return nil, err
 	}
 

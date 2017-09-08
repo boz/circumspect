@@ -2,7 +2,7 @@ package docker
 
 import (
 	"github.com/boz/circumspect/propset"
-	"github.com/docker/docker/api/types"
+	"github.com/docker/engine-api/types"
 )
 
 type Props interface {

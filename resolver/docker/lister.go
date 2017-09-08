@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/client"
+	"github.com/docker/engine-api/client"
+	"github.com/docker/engine-api/types"
+	"github.com/docker/engine-api/types/filters"
 	"github.com/sirupsen/logrus"
 )
 
@@ -148,8 +148,8 @@ loop:
 func newListRunner(ctx context.Context, client *client.Client, filter filters.Args) Runner {
 	return NewRunner(ctx, func(ctx context.Context) (interface{}, error) {
 		options := types.ContainerListOptions{
-			Filters: filter,
-			All:     true,
+			Filter: filter,
+			All:    true,
 		}
 		return client.ContainerList(ctx, options)
 	})
