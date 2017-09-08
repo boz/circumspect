@@ -9,7 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var log = logrus.StandardLogger().WithField("package", "resolver/docker")
+var pkglog = logrus.StandardLogger().WithField("package", "resolver/docker")
 
 type RequiredProps interface {
 	Pid() int
@@ -31,7 +31,7 @@ type Service interface {
 }
 
 func NewService(ctx context.Context) (Service, error) {
-	log := log.WithField("component", "service")
+	log := pkglog.WithField("component", "service")
 
 	// todo: configurable
 	client, err := client.NewEnvClient()
@@ -45,7 +45,7 @@ func NewService(ctx context.Context) (Service, error) {
 		return nil, err
 	}
 
-	log.Debugf("connected to docker %#v", ping)
+	log.Debugf("connected to docker %v", ping.Name)
 
 	// todo: configurable
 	filter := filters.NewArgs()
@@ -218,7 +218,10 @@ func (s *service) handleContainerList(containers []types.Container) {
 }
 
 func (s *service) handleWatchEvent(event WatchEvent) {
-	s.log.WithField("docker-id", event.ID).Debugf("watcher event received: %v")
+	s.log.WithField("docker-id", event.ID).
+		WithField("event-type", event.Type).
+		Debug("watcher event received")
+
 	switch event.Type {
 	case EventTypeCreate, EventTypeUpdate:
 		s.refreshContainer(event.ID)

@@ -7,43 +7,84 @@ the server is able to determine:
 
  * pid, uid, gid of the client.
  * if the client is running in docker, attributes of the container that it's running in
- * ~~if the client is running in kubernetes, attributes of the kubernetes pod and container~~ _disabled; see [here](#kubernetes)_
+ * if the client is running in kubernetes, attributes of the kubernetes pod and container
 
 ## Usage
 
-### Connect to server from a client running in docker
+### Start server inside minikube
 
-server terminal
+After [building](#building), boot up minikube and install binary and docker image:
 
 ```sh
-$ ./circumspect server
+$ make integration-minikube
 ```
 
-client terminal
+### Connect from a docker container
+
+In another terminal, launch a docker container inside minikube
 
 ```sh
-$ make integration
+$ make minikube-run-docker
 ```
 
-Once the client connects, the server should output its properties:
+The `make integration-minikube` terminal should display:
 
-```sh
-process 22295 properties:
+```
+process 4050 properties:
 
-docker-id      7c528a3b375f454add356a962dadd1bd57a454223cb182cccf4665153f2d2b60
-docker-image   sha256:6084f5234b59e5767eb8b8a684bd83cf75c2352b951efc02dea23759d68eb0ad
-docker-labels  com.docker.compose.config-hash       7e309c49308ffbb07d6e428134f303c77faa784777f595583ec8b82837c57929
-               com.docker.compose.container-number  1
-               com.docker.compose.oneoff            False
-               com.docker.compose.project           circumspect
-               com.docker.compose.service           worker
-               com.docker.compose.version           1.15.0
-               not-a-hacker                         tremendously
+docker-id      97f529ffdb257633e7f3bb46d210d9761b00e29f07e23879ad90d7cb45451f30
+docker-image   sha256:c32901baff489930b3ad0ad03ff709547452eee49cc6cfe1fe78af65f81fc918
+docker-labels  foo  bar
 docker-path    ./circumspect
-docker-pid     22295
+docker-pid     4050
 gid            0
-pid            22295
+pid            4050
 uid            0
+```
+
+### Connect from a kubernetes pod
+
+Create a pod which connects as a client
+
+```sh
+$ make minikube-create-pod
+```
+
+The `make integration-minikube` terminal should display:
+
+```
+process 4386 properties:
+
+docker-id            72580b1439f87913edd0d9c1d5b622105ea47911f642a70ed0b36e94dc6ecf7e
+docker-image         sha256:c32901baff489930b3ad0ad03ff709547452eee49cc6cfe1fe78af65f81fc918
+docker-labels        io.kubernetes.container.name                                 worker-container
+                     io.kubernetes.pod.namespace                                  default
+                     annotation.io.kubernetes.container.hash                      2eef9918
+                     annotation.io.kubernetes.container.restartCount              0
+                     annotation.io.kubernetes.container.terminationMessagePath    /dev/termination-log
+                     annotation.io.kubernetes.container.terminationMessagePolicy  File
+                     annotation.io.kubernetes.pod.terminationGracePeriod          30
+                     io.kubernetes.container.logpath                              /var/log/pods/7b4a6c6b-9470-11e7-9e14-08002740d2fd/worker-container_0.log
+                     io.kubernetes.docker.type                                    container
+                     io.kubernetes.pod.name                                       worker
+                     io.kubernetes.pod.uid                                        7b4a6c6b-9470-11e7-9e14-08002740d2fd
+                     io.kubernetes.sandbox.id                                     85739086a895027958e2e2f77acc120da80d1229a0c2071f5eb6df88e81e873f
+docker-path          /bin/sh
+docker-pid           4323
+gid                  0
+kube-annotations     this-is-a-worker  true
+kube-container-name  worker-container
+kube-labels          foo  bar
+kube-namespace       default
+kube-pod-name        worker
+pid                  4386
+uid                  0
+```
+
+The [pod](_integration/pod.yml) connects every five seconds.  Stop it with
+
+```sh
+$ make minikube-delete-pod
 ```
 
 ### Inspect arbitrary pids on the system
@@ -110,15 +151,7 @@ make
 
 ## Status
 
-### Kubernetes
-
- * This POC was developed with recent docker release libraries.
- * Minikube (and docker in general) can't uses the latest docker release.  See [here](https://github.com/kubernetes/kubernetes/issues/40182) and [here](https://github.com/kubernetes/minikube/pull/1542)
- * Downgrading the docker client library involves using a pre-moby release with a lot of changes.
-
-It's just too much of a PITA for a dumb POC.
-
-### Other Platforms
+Only works on linux.  More info here:
 
  * https://groups.google.com/forum/#!topic/golang-dev/OgfhJ8Ujabo
  * https://github.com/golang/go/issues/1101

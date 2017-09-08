@@ -21,7 +21,7 @@ type Container interface {
 }
 
 func NewContainer(ctx context.Context, client *client.Client, registry Registry, id string) Container {
-	log := log.WithField("docker-id", id).WithField("component", "container")
+	log := pkglog.WithField("docker-id", id).WithField("component", "container")
 
 	ctx, cancel := context.WithCancel(ctx)
 

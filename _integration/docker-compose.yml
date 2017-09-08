@@ -2,7 +2,7 @@ version: '3'
 
 services:
   worker:
-    build: .
+    build: ..
     command: client
     labels:
       not-a-hacker: tremendously

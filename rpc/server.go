@@ -12,10 +12,10 @@ import (
 	grpc "google.golang.org/grpc"
 )
 
-var log = logrus.StandardLogger().WithField("package", "rpc")
+var pkglog = logrus.StandardLogger().WithField("package", "rpc")
 
 func RunServer(ctx context.Context, path string, fn func(context.Context, uds.Props)) error {
-	log := log.WithField("component", "server")
+	log := pkglog.WithField("component", "server")
 
 	sock, err := net.Listen("unix", path)
 	if err != nil {

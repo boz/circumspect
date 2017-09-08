@@ -27,7 +27,7 @@ func Fprint(out io.Writer, pset PropSet) {
 		case Map:
 
 			if len(prop) == 0 {
-				fmt.Fprintf(table, "{}", name)
+				fmt.Fprintf(table, "{}\n")
 				continue
 			}
 

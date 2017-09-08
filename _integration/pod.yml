@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: worker
+  labels:
+    foo: bar
+  annotations:
+    this-is-a-worker: "true"
+spec:
+  containers:
+  - name: worker-container
+    image: circumspect.io/circumspect
+    imagePullPolicy: IfNotPresent
+    command: ["/bin/sh"]
+    args:
+      - "-c"
+      - |
+        while true; do
+          ./circumspect -ldebug client -s /worker/socket.socket
+          sleep 5
+        done
+    volumeMounts:
+    - mountPath: /worker
+      name: circumspect-socket
+  volumes:
+  - name: circumspect-socket
+    hostPath:
+      path: /tmp/circumspect
+  restartPolicy: Never

@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: worker
+spec:
+  template:
+    metadata:
+      name: worker
+    spec:
+      containers:
+      - name: worker-container
+        image: circumspect.io/circumspect
+        imagePullPolicy: IfNotPresent
+        command: ["./circumspect","client","-s","/worker/socket.sock"]
+        volumeMounts:
+        - mountPath: /worker
+          name: circumspect-socket
+      volumes:
+      - name: circumspect-socket
+        hostPath:
+          path: /tmp/circumspect
+      restartPolicy: Never

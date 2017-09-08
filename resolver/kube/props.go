@@ -37,7 +37,7 @@ func (p props) KubeLabels() map[string]string {
 }
 
 func (p props) KubeAnnotations() map[string]string {
-	return p.pod.Labels
+	return p.pod.Annotations
 }
 
 func (p props) KubeContainerName() string {

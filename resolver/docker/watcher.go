@@ -41,7 +41,7 @@ func NewWatcher(ctx context.Context, client *client.Client, filter filters.Args)
 		filter:  filter,
 		eventch: make(chan WatchEvent, watcherDefaultBufsiz),
 		donech:  make(chan struct{}),
-		log:     log.WithField("component", "watcher"),
+		log:     pkglog.WithField("component", "watcher"),
 		cancel:  cancel,
 		ctx:     ctx,
 	}
@@ -92,7 +92,7 @@ func (w *watcher) run() {
 	// todo: retry, throttle
 	stream, err := w.client.Events(w.ctx, options)
 	if err != nil {
-		log.WithError(err).Error("error getting events")
+		pkglog.WithError(err).Error("error getting events")
 		return
 	}
 	defer stream.Close()
@@ -105,7 +105,7 @@ func (w *watcher) run() {
 
 		if err := decoder.Decode(&event); err != nil {
 			if w.ctx.Err() == nil {
-				log.WithError(err).Error("error decoding stream")
+				pkglog.WithError(err).Error("error decoding stream")
 			}
 			return
 		}
@@ -119,12 +119,14 @@ func (w *watcher) run() {
 			wevent = WatchEvent{EventTypeCreate, event.Actor.ID}
 		case watcherActionDie:
 			wevent = WatchEvent{EventTypeDelete, event.Actor.ID}
+		default:
+			continue
 		}
 
 		select {
 		case w.eventch <- wevent:
 		default:
-			log.Warn("dropping event")
+			pkglog.Warn("dropping event")
 		}
 	}
 }

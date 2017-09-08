@@ -59,7 +59,7 @@ type registryLookupRequest struct {
 func NewRegistry(ctx context.Context) Registry {
 	ctx, cancel := context.WithCancel(ctx)
 
-	log := log.WithField("component", "registry")
+	log := pkglog.WithField("component", "registry")
 
 	r := &registry{
 		lookupch: make(chan *registryLookupRequest),
@@ -177,7 +177,7 @@ func (r *registry) doSubmit(c types.ContainerJSON) {
 }
 
 func (r *registry) doLookup(req *registryLookupRequest) {
-	log := log.WithField("request-pid", req.pid)
+	log := pkglog.WithField("request-pid", req.pid)
 	log.Debug("looking up container")
 
 	var pids []int

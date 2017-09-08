@@ -24,7 +24,7 @@ type Lister interface {
 }
 
 func NewLister(ctx context.Context, client *client.Client, filter filters.Args) Lister {
-	log := log.WithField("component", "lister")
+	log := pkglog.WithField("component", "lister")
 
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -103,7 +103,7 @@ loop:
 
 			containers = filterContainers(runner.Result().([]types.Container))
 
-			l.log.Debug("list complete: %v containers found", len(containers))
+			l.log.Debugf("list complete: %v containers found", len(containers))
 
 			if len(containers) > 0 {
 				outch = l.outch

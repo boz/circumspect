@@ -10,7 +10,7 @@ import (
 )
 
 func RunClient(ctx context.Context, path string) error {
-	log := log.WithField("component", "client")
+	log := pkglog.WithField("component", "client")
 
 	log.Debugf("connecting to %v ...", path)
 

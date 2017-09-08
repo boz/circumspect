@@ -303,6 +303,18 @@
 			"revisionTime": "2017-08-26T19:56:54Z"
 		},
 		{
+			"checksumSHA1": "d9PxF1XQGLMJZRct2R8qVM/eYlE=",
+			"path": "github.com/hashicorp/golang-lru",
+			"revision": "0a025b7e63adc15a622f29b0b2c4c3848243bbf6",
+			"revisionTime": "2016-08-13T22:13:03Z"
+		},
+		{
+			"checksumSHA1": "9hffs0bAIU6CquiRhKQdzjHnKt0=",
+			"path": "github.com/hashicorp/golang-lru/simplelru",
+			"revision": "0a025b7e63adc15a622f29b0b2c4c3848243bbf6",
+			"revisionTime": "2016-08-13T22:13:03Z"
+		},
+		{
 			"checksumSHA1": "K6exl2ouL7d8cR2i378EzZOdRVI=",
 			"path": "github.com/howeyc/gopass",
 			"revision": "bf9dde6d0d2c004a008c27aaee91170c786f6db8",
@@ -957,6 +969,12 @@
 			"revisionTime": "2017-08-29T11:15:34Z"
 		},
 		{
+			"checksumSHA1": "ZafNsuBNEOinRgqaCFmTnhHm2gQ=",
+			"path": "k8s.io/apimachinery/pkg/util/cache",
+			"revision": "b166f81f5c4c88402ae23a0d0944c6ad08bffd3b",
+			"revisionTime": "2017-08-29T11:15:34Z"
+		},
+		{
 			"checksumSHA1": "2g3yhAcIQkh5Ew7/jiBIq4qNvJE=",
 			"path": "k8s.io/apimachinery/pkg/util/clock",
 			"revision": "b166f81f5c4c88402ae23a0d0944c6ad08bffd3b",
@@ -1239,6 +1257,12 @@
 		{
 			"checksumSHA1": "gc2fJMsET0ZYX+WuEIMJrlihWH4=",
 			"path": "k8s.io/client-go/tools/auth",
+			"revision": "db8228460e2de17f5d3a9a453f61dde0ba86545a",
+			"revisionTime": "2017-08-28T20:11:55Z"
+		},
+		{
+			"checksumSHA1": "q1PEgxxkRf1J73pwkc/eiOjuFWs=",
+			"path": "k8s.io/client-go/tools/cache",
 			"revision": "db8228460e2de17f5d3a9a453f61dde0ba86545a",
 			"revisionTime": "2017-08-28T20:11:55Z"
 		},
